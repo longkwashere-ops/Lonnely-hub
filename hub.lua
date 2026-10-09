@@ -1,5 +1,5 @@
 -- ============================================================
--- LONELY HUB v74 - FULL + TRAIL (FIX PCALL)
+-- LONELY HUB v76 - ICON CHỈ BẤM (KHÔNG DRAG)
 -- Speed 16 / Jump 50 / Gravity 190 / FOV 70 / Smooth 40
 -- ============================================================
 
@@ -173,7 +173,6 @@ icon.TextColor3 = Color3.fromRGB(255, 255, 255)
 icon.TextSize = 24
 icon.Font = HUB_FONT
 icon.Visible = true
-icon.Active = true
 icon.AutoButtonColor = false
 icon.ZIndex = 100
 icon.Parent = gui
@@ -242,7 +241,7 @@ local subtitle = Instance.new("TextLabel")
 subtitle.Size = UDim2.new(0, 80, 1, 0)
 subtitle.Position = UDim2.new(1, -100, 0, 0)
 subtitle.BackgroundTransparency = 1
-subtitle.Text = "HUB v74"
+subtitle.Text = "HUB v76"
 subtitle.TextColor3 = Color3.fromRGB(80, 80, 80)
 subtitle.TextSize = 11
 subtitle.Font = Enum.Font.Gotham
@@ -584,4 +583,6 @@ local trailToggle = makeToggle("TRAIL", function(v)
 end)
 
 local espEnabled = false
-local es
+local espObjects = {}
+
+loc
