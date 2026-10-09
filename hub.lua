@@ -1,5 +1,5 @@
 -- ============================================================
--- LONELY HUB v76 - ICON CHỈ BẤM (KHÔNG DRAG)
+-- LONELY HUB v77 - FULL
 -- Speed 16 / Jump 50 / Gravity 190 / FOV 70 / Smooth 40
 -- ============================================================
 
@@ -241,7 +241,7 @@ local subtitle = Instance.new("TextLabel")
 subtitle.Size = UDim2.new(0, 80, 1, 0)
 subtitle.Position = UDim2.new(1, -100, 0, 0)
 subtitle.BackgroundTransparency = 1
-subtitle.Text = "HUB v76"
+subtitle.Text = "HUB v77"
 subtitle.TextColor3 = Color3.fromRGB(80, 80, 80)
 subtitle.TextSize = 11
 subtitle.Font = Enum.Font.Gotham
@@ -585,4 +585,215 @@ end)
 local espEnabled = false
 local espObjects = {}
 
-loc
+local function createESP(player)
+    if player == LocalPlayer then return end
+    if espObjects[player] then return end
+    if not player.Character then return end
+    if not player.Character:FindFirstChild("Head") then return end
+    local head = player.Character:FindFirstChild("Head")
+
+    local billboard = Instance.new("BillboardGui")
+    billboard.Name = "ESP_Name"
+    billboard.Size = UDim2.new(0, 240, 0, 50)
+    billboard.StudsOffset = Vector3.new(0, 3.2, 0)
+    billboard.AlwaysOnTop = true
+    billboard.Enabled = espEnabled
+    billboard.Parent = head
+
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(1, 0, 1, 0)
+    label.BackgroundTransparency = 1
+    label.Text = player.Name
+    label.TextSize = 22
+    label.Font = ESP_FONT
+    label.TextStrokeTransparency = 0
+    label.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+    label.TextColor3 = Color3.fromRGB(255, 255, 255)
+    label.Parent = billboard
+
+    local gradient = Instance.new("UIGradient")
+    gradient.Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 255, 255)),
+        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(160, 160, 160)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 255, 255))
+    })
+    gradient.Rotation = 90
+    gradient.Parent = label
+
+    espObjects[player] = billboard
+end
+
+local function removeESP(player)
+    if espObjects[player] then
+        pcall(function() espObjects[player]:Destroy() end)
+        espObjects[player] = nil
+    end
+end
+
+local function refreshESP()
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer then createESP(player) end
+    end
+end
+
+local function hookPlayer(player)
+    if player == LocalPlayer then return end
+    player.CharacterAdded:Connect(function()
+        task.wait(0.5)
+        if espEnabled then createESP(player) end
+    end)
+    player.CharacterRemoving:Connect(function() removeESP(player) end)
+end
+
+for _, player in ipairs(Players:GetPlayers()) do hookPlayer(player) end
+Players.PlayerAdded:Connect(hookPlayer)
+Players.PlayerRemoving:Connect(removeESP)
+
+local espToggle = makeToggle("ESP", function(v)
+    espEnabled = v
+    if v then refreshESP()
+    else for player, _ in pairs(espObjects) do removeESP(player) end end
+end)
+
+makeSection("> UTILS")
+
+local lockBtn = Instance.new("TextButton")
+lockBtn.Size = UDim2.new(1, 0, 0, 40)
+lockBtn.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+lockBtn.BackgroundTransparency = 0.85
+lockBtn.BorderSizePixel = 0
+lockBtn.Text = "LOCK: OFF"
+lockBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+lockBtn.TextSize = 16
+lockBtn.Font = HUB_FONT
+lockBtn.AutoButtonColor = false
+lockBtn.ZIndex = 51
+lockBtn.Parent = container
+Instance.new("UICorner", lockBtn).CornerRadius = UDim.new(0, 10)
+local lockStroke = Instance.new("UIStroke", lockBtn)
+lockStroke.Color = Color3.fromRGB(255, 255, 255); lockStroke.Thickness = 1; lockStroke.Transparency = 0.7
+
+lockBtn.MouseButton1Click:Connect(function()
+    isLocked = not isLocked
+    lockBtn.Text = "LOCK: " .. (isLocked and "ON" or "OFF")
+    lockBtn.BackgroundTransparency = isLocked and 0.6 or 0.85
+    lockStroke.Transparency = isLocked and 0.4 or 0.7
+end)
+
+local btnReset = Instance.new("TextButton")
+btnReset.Size = UDim2.new(1, 0, 0, 38)
+btnReset.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+btnReset.BackgroundTransparency = 0.55
+btnReset.BorderSizePixel = 0
+btnReset.Text = "RESET ALL"
+btnReset.TextColor3 = Color3.fromRGB(0, 0, 0)
+btnReset.TextSize = 16
+btnReset.Font = HUB_FONT
+btnReset.AutoButtonColor = false
+btnReset.ZIndex = 51
+btnReset.Parent = container
+Instance.new("UICorner", btnReset).CornerRadius = UDim.new(0, 10)
+
+btnReset.MouseButton1Click:Connect(function()
+    if isLocked then return end
+    speedSlider.set(16); applySpeed()
+    jumpSlider.set(50); applyJump()
+    gravSlider.set(190); applyGravity()
+    fovSlider.set(70); applyFOV()
+    smoothSpeedSlider.set(40); state.smoothSpeed = 40
+    infJumpToggle.set(false); infJumpOn = false
+    speedDisplayToggle.set(false); speedDisplayOn = false; speedLabel.Visible = false
+    smoothToggle.set(false); smoothOn = false
+    destroyBV()
+    trailToggle.set(false); trailOn = false
+    removeTrail()
+end)
+
+btnMin.MouseButton1Click:Connect(function()
+    main.Visible = false
+    icon.Visible = true
+end)
+
+btnClose.MouseButton1Click:Connect(function()
+    gui:Destroy()
+end)
+
+-- ===== ICON: BẤM MỞ HUB + KÉO DI CHUYỂN =====
+local iconDragStart, iconStartPos, iconMoved = nil, nil, false
+
+icon.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        iconDragStart = input.Position
+        iconStartPos = icon.Position
+        iconMoved = false
+    end
+end)
+
+UserInput.InputChanged:Connect(function(input)
+    if not iconDragStart then return end
+    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+        local delta = input.Position - iconDragStart
+        if math.abs(delta.X) > 8 or math.abs(delta.Y) > 8 then iconMoved = true end
+        if iconMoved then
+            icon.Position = UDim2.new(
+                iconStartPos.X.Scale, iconStartPos.X.Offset + delta.X,
+                iconStartPos.Y.Scale, iconStartPos.Y.Offset + delta.Y
+            )
+        end
+    end
+end)
+
+UserInput.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        if iconDragStart and not iconMoved then
+            main.Visible = true
+            icon.Visible = false
+        end
+        iconDragStart = nil
+        iconMoved = false
+    end
+end)
+
+LocalPlayer.CharacterAdded:Connect(function(newChar)
+    character = newChar
+    humanoid = newChar:WaitForChild("Humanoid")
+    rootPart = newChar:WaitForChild("HumanoidRootPart")
+    task.wait(0.5)
+    if smoothOn then
+        setupBV()
+        humanoid.WalkSpeed = state.smoothSpeed
+    else
+        applySpeed(); applyJump()
+    end
+    if trailOn then
+        createTrail()
+    end
+end)
+
+applySpeed(); applyJump(); applyGravity(); applyFOV()
+
+task.spawn(function()
+    while task.wait(1) do
+        pcall(function()
+            if Camera.FieldOfView ~= state.fov then Camera.FieldOfView = state.fov end
+            if humanoid and humanoid.Parent then
+                if smoothOn then
+                    if humanoid.WalkSpeed ~= state.smoothSpeed then
+                        humanoid.WalkSpeed = state.smoothSpeed
+                    end
+                else
+                    if humanoid.WalkSpeed ~= state.speed then
+                        humanoid.WalkSpeed = state.speed
+                    end
+                end
+                if humanoid.JumpPower ~= state.jump then
+                    humanoid.JumpPower = state.jump
+                    humanoid.UseJumpPower = true
+                end
+            end
+            if workspace.Gravity ~= state.gravity then workspace.Gravity = state.gravity end
+        end)
+    end
+end)
+
+print("[Lonely Hub v77 Mobile] READY")
