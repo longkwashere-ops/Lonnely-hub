@@ -1,11 +1,12 @@
 -- ============================================================
--- LONELY HUB v77 - FULL
+-- LONELY HUB v81 - AUTO PRESS C + REAL CLOCK
 -- Speed 16 / Jump 50 / Gravity 190 / FOV 70 / Smooth 40
 -- ============================================================
 
 local Players = game:GetService("Players")
 local UserInput = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
+local VirtualInputManager = game:GetService("VirtualInputManager")
 local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 
@@ -16,16 +17,91 @@ local isDraggingSlider = false
 local isLocked = false
 local activeSlider = nil
 
-local state = { speed = 16, jump = 50, gravity = 190, fov = 70, smoothSpeed = 40 }
+local state = { speed = 16, jump = 50, gravity = 190, fov = 70, smoothSpeed = 40, speedOn = true, jumpOn = true }
 
 local character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
 local humanoid = character:WaitForChild("Humanoid")
 local rootPart = character:WaitForChild("HumanoidRootPart")
 
-local function applySpeed() if humanoid and humanoid.Parent then humanoid.WalkSpeed = state.speed end end
-local function applyJump() if humanoid and humanoid.Parent then humanoid.JumpPower = state.jump; humanoid.UseJumpPower = true end end
+local function applySpeed() if humanoid and humanoid.Parent and state.speedOn then humanoid.WalkSpeed = state.speed end end
+local function applyJump() if humanoid and humanoid.Parent and state.jumpOn then humanoid.JumpPower = state.jump; humanoid.UseJumpPower = true end end
 local function applyGravity() workspace.Gravity = state.gravity end
 local function applyFOV() Camera.FieldOfView = state.fov end
+
+-- ===== TIMER GUI =====
+local timerGui = Instance.new("ScreenGui")
+timerGui.Name = "TimerDisplay"
+timerGui.ResetOnSpawn = false
+timerGui.IgnoreGuiInset = true
+timerGui.Parent = game:GetService("CoreGui")
+
+-- Auto press timer (trên)
+local autoPressOn = false
+local autoPressTimeLeft = 300
+local autoPressAccumulated = 0
+
+local timerLabel = Instance.new("TextLabel")
+timerLabel.Size = UDim2.new(0, 100, 0, 30)
+timerLabel.Position = UDim2.new(1, -110, 0, 10)
+timerLabel.BackgroundTransparency = 1
+timerLabel.Text = "5:00"
+timerLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+timerLabel.TextSize = 22
+timerLabel.Font = Enum.Font.GothamBold
+timerLabel.TextStrokeTransparency = 0
+timerLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+timerLabel.TextXAlignment = Enum.TextXAlignment.Right
+timerLabel.Visible = false
+timerLabel.Parent = timerGui
+
+-- Real clock (dưới)
+local clockLabel = Instance.new("TextLabel")
+clockLabel.Size = UDim2.new(0, 120, 0, 30)
+clockLabel.Position = UDim2.new(1, -130, 0, 45)
+clockLabel.BackgroundTransparency = 1
+clockLabel.Text = "00:00:00"
+clockLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+clockLabel.TextSize = 22
+clockLabel.Font = Enum.Font.GothamBold
+clockLabel.TextStrokeTransparency = 0
+clockLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+clockLabel.TextXAlignment = Enum.TextXAlignment.Right
+clockLabel.Visible = false
+clockLabel.Parent = timerGui
+
+local function pressC()
+    pcall(function()
+        VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.C, false, game)
+        task.wait(0.05)
+        VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.C, false, game)
+    end)
+end
+
+RunService.Heartbeat:Connect(function(dt)
+    if autoPressOn then
+        autoPressAccumulated = autoPressAccumulated + dt
+        if autoPressAccumulated >= 1 then
+            autoPressAccumulated = autoPressAccumulated - 1
+            autoPressTimeLeft = autoPressTimeLeft - 1
+            if autoPressTimeLeft <= 0 then
+                autoPressTimeLeft = 300
+                pressC()
+            end
+            local m = math.floor(autoPressTimeLeft / 60)
+            local s = autoPressTimeLeft % 60
+            timerLabel.Text = string.format("%d:%02d", m, s)
+        end
+    else
+        local m2 = math.floor(autoPressTimeLeft / 60)
+        local s2 = autoPressTimeLeft % 60
+        timerLabel.Text = string.format("%d:%02d (off)", m2, s2)
+    end
+
+    if clockLabel.Visible then
+        local t = os.date("*t")
+        clockLabel.Text = string.format("%02d:%02d:%02d", t.hour, t.min, t.sec)
+    end
+end)
 
 -- ===== SPEED DISPLAY =====
 local speedGui = Instance.new("ScreenGui")
@@ -191,8 +267,8 @@ task.spawn(function()
 end)
 
 local main = Instance.new("Frame")
-main.Size = UDim2.new(0, 420, 0, 320)
-main.Position = UDim2.new(0.5, -210, 0.5, -160)
+main.Size = UDim2.new(0, 420, 0, 380)
+main.Position = UDim2.new(0.5, -210, 0.5, -190)
 main.BackgroundColor3 = Color3.fromRGB(12, 12, 14)
 main.BackgroundTransparency = 0.15
 main.BorderSizePixel = 0
@@ -241,7 +317,7 @@ local subtitle = Instance.new("TextLabel")
 subtitle.Size = UDim2.new(0, 80, 1, 0)
 subtitle.Position = UDim2.new(1, -100, 0, 0)
 subtitle.BackgroundTransparency = 1
-subtitle.Text = "HUB v77"
+subtitle.Text = "HUB v81"
 subtitle.TextColor3 = Color3.fromRGB(80, 80, 80)
 subtitle.TextSize = 11
 subtitle.Font = Enum.Font.Gotham
@@ -496,7 +572,7 @@ local function makeSlider(name, default, min, max, step, callback)
     }
 end
 
-local function makeToggle(name, callback)
+local function makeToggle(name, defaultState, callback)
     local btn = Instance.new("TextButton")
     btn.Size = UDim2.new(1, 0, 0, 40)
     btn.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
@@ -515,7 +591,13 @@ local function makeToggle(name, callback)
     btnStroke.Thickness = 1
     btnStroke.Transparency = 0.7
 
-    local on = false
+    local on = defaultState or false
+    if on then
+        btn.Text = name .. ": ON"
+        btn.BackgroundTransparency = 0.6
+        btnStroke.Transparency = 0.4
+    end
+
     btn.MouseButton1Click:Connect(function()
         if isLocked then return end
         on = not on
@@ -545,10 +627,15 @@ local gravSlider = makeSlider("GRAVITY", state.gravity, 0, 500, 10, function(v) 
 local fovSlider = makeSlider("FOV", state.fov, 70, 160, 5, function(v) state.fov = v; applyFOV() end)
 local smoothSpeedSlider = makeSlider("SMOOTH SPD", state.smoothSpeed, 0, 500, 2, function(v) state.smoothSpeed = v end)
 
+makeSection("> LOCKS")
+
+local speedToggle = makeToggle("SPEED LOCK", true, function(v) state.speedOn = v end)
+local jumpToggle = makeToggle("JUMP LOCK", true, function(v) state.jumpOn = v end)
+
 makeSection("> TOGGLES")
 
 local infJumpOn = false
-local infJumpToggle = makeToggle("INF JUMP", function(v) infJumpOn = v end)
+local infJumpToggle = makeToggle("INF JUMP", false, function(v) infJumpOn = v end)
 
 UserInput.JumpRequest:Connect(function()
     if isLocked then return end
@@ -557,12 +644,12 @@ UserInput.JumpRequest:Connect(function()
     end
 end)
 
-local speedDisplayToggle = makeToggle("SPEED DISPLAY", function(v)
+local speedDisplayToggle = makeToggle("SPEED DISPLAY", false, function(v)
     speedDisplayOn = v
     speedLabel.Visible = v
 end)
 
-local smoothToggle = makeToggle("SMOOTH SPEED", function(v)
+local smoothToggle = makeToggle("SMOOTH SPEED", false, function(v)
     smoothOn = v
     if v then
         setupBV()
@@ -573,13 +660,26 @@ local smoothToggle = makeToggle("SMOOTH SPEED", function(v)
     end
 end)
 
-local trailToggle = makeToggle("TRAIL", function(v)
+local trailToggle = makeToggle("TRAIL", false, function(v)
     trailOn = v
     if v then
         createTrail()
     else
         removeTrail()
     end
+end)
+
+local autoPressToggle = makeToggle("AUTO PRESS C", false, function(v)
+    autoPressOn = v
+    timerLabel.Visible = v
+    if v then
+        autoPressTimeLeft = 300
+        autoPressAccumulated = 0
+    end
+end)
+
+local realClockToggle = makeToggle("REAL CLOCK", false, function(v)
+    clockLabel.Visible = v
 end)
 
 local espEnabled = false
@@ -649,7 +749,7 @@ for _, player in ipairs(Players:GetPlayers()) do hookPlayer(player) end
 Players.PlayerAdded:Connect(hookPlayer)
 Players.PlayerRemoving:Connect(removeESP)
 
-local espToggle = makeToggle("ESP", function(v)
+local espToggle = makeToggle("ESP", false, function(v)
     espEnabled = v
     if v then refreshESP()
     else for player, _ in pairs(espObjects) do removeESP(player) end end
@@ -696,17 +796,22 @@ Instance.new("UICorner", btnReset).CornerRadius = UDim.new(0, 10)
 
 btnReset.MouseButton1Click:Connect(function()
     if isLocked then return end
-    speedSlider.set(16); applySpeed()
-    jumpSlider.set(50); applyJump()
-    gravSlider.set(190); applyGravity()
-    fovSlider.set(70); applyFOV()
+    speedSlider.set(16); state.speed = 16; applySpeed()
+    jumpSlider.set(50); state.jump = 50; applyJump()
+    gravSlider.set(190); state.gravity = 190; applyGravity()
+    fovSlider.set(70); state.fov = 70; applyFOV()
     smoothSpeedSlider.set(40); state.smoothSpeed = 40
+    speedToggle.set(true); state.speedOn = true
+    jumpToggle.set(true); state.jumpOn = true
     infJumpToggle.set(false); infJumpOn = false
     speedDisplayToggle.set(false); speedDisplayOn = false; speedLabel.Visible = false
     smoothToggle.set(false); smoothOn = false
     destroyBV()
     trailToggle.set(false); trailOn = false
     removeTrail()
+    autoPressToggle.set(false); autoPressOn = false; timerLabel.Visible = false
+    autoPressTimeLeft = 300
+    realClockToggle.set(false); clockLabel.Visible = false
 end)
 
 btnMin.MouseButton1Click:Connect(function()
@@ -782,11 +887,11 @@ task.spawn(function()
                         humanoid.WalkSpeed = state.smoothSpeed
                     end
                 else
-                    if humanoid.WalkSpeed ~= state.speed then
+                    if state.speedOn and humanoid.WalkSpeed ~= state.speed then
                         humanoid.WalkSpeed = state.speed
                     end
                 end
-                if humanoid.JumpPower ~= state.jump then
+                if state.jumpOn and humanoid.JumpPower ~= state.jump then
                     humanoid.JumpPower = state.jump
                     humanoid.UseJumpPower = true
                 end
@@ -796,4 +901,4 @@ task.spawn(function()
     end
 end)
 
-print("[Lonely Hub v77 Mobile] READY")
+print("[Lonely Hub v81 Mobile] READY")
