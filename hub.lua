@@ -1,6 +1,7 @@
 -- ============================================================
--- LONELY HUB v83 - FULL + MIN/MAX ZOOM + UNLOCK FPS + HIDE BODY
--- Speed 16 / Jump 50 / Gravity 190 / FOV 70 / Smooth 40
+-- LONELY HUB v90 FINAL - FULL FIXED VERSION
+-- Fix: Smooth Speed (BV+BG không khóa hướng), Speed Display
+-- Không đổi tên ngẫu nhiên - giữ nguyên tên gốc
 -- ============================================================
 
 local Players = game:GetService("Players")
@@ -38,7 +39,6 @@ local function applyZoom()
         LocalPlayer.CameraMaxZoomDistance = state.maxZoom
     end)
 end
-
 applyZoom()
 
 -- ===== UNLOCK FPS LOOP =====
@@ -56,26 +56,14 @@ RunService.RenderStepped:Connect(function()
     end)
 end)
 
--- ===== HIDE BODY LOGIC =====
-local function hidePart(part)
-    if part and part:IsA("BasePart") then
-        part.LocalTransparencyModifier = 1
-    end
-end
-
-local function showPart(part)
-    if part and part:IsA("BasePart") then
-        part.LocalTransparencyModifier = 0
-    end
-end
+-- ===== HIDE BODY =====
+local function hidePart(part) if part and part:IsA("BasePart") then part.LocalTransparencyModifier = 1 end end
+local function showPart(part) if part and part:IsA("BasePart") then part.LocalTransparencyModifier = 0 end end
 
 local function applyHide()
     if not character or not character.Parent then return end
-
     local head = character:FindFirstChild("Head")
-    if head then
-        if state.head or state.allHide then hidePart(head) else showPart(head) end
-    end
+    if head then if state.head or state.allHide then hidePart(head) else showPart(head) end end
 
     local torso = character:FindFirstChild("Torso")
     local upperTorso = character:FindFirstChild("UpperTorso")
@@ -119,20 +107,16 @@ local function applyHide()
         end
     end
 end
-
 applyHide()
-
-RunService.Heartbeat:Connect(function()
-    if not character or not character.Parent then return end
-    applyHide()
-end)
+RunService.Heartbeat:Connect(function() if character and character.Parent then applyHide() end end)
 
 -- ===== TIMER GUI =====
 local timerGui = Instance.new("ScreenGui")
 timerGui.Name = "TimerDisplay"
 timerGui.ResetOnSpawn = false
 timerGui.IgnoreGuiInset = true
-timerGui.Parent = game:GetService("CoreGui")
+pcall(function() timerGui.Parent = game:GetService("CoreGui") end)
+if not timerGui.Parent then timerGui.Parent = LocalPlayer:WaitForChild("PlayerGui") end
 
 local autoPressOn = false
 local autoPressTimeLeft = 300
@@ -180,10 +164,7 @@ RunService.Heartbeat:Connect(function(dt)
         if autoPressAccumulated >= 1 then
             autoPressAccumulated = autoPressAccumulated - 1
             autoPressTimeLeft = autoPressTimeLeft - 1
-            if autoPressTimeLeft <= 0 then
-                autoPressTimeLeft = 300
-                pressC()
-            end
+            if autoPressTimeLeft <= 0 then autoPressTimeLeft = 300; pressC() end
             local m = math.floor(autoPressTimeLeft / 60)
             local s = autoPressTimeLeft % 60
             timerLabel.Text = string.format("%d:%02d", m, s)
@@ -193,7 +174,6 @@ RunService.Heartbeat:Connect(function(dt)
         local s2 = autoPressTimeLeft % 60
         timerLabel.Text = string.format("%d:%02d (off)", m2, s2)
     end
-
     if clockLabel.Visible then
         local t = os.date("*t")
         clockLabel.Text = string.format("%02d:%02d:%02d", t.hour, t.min, t.sec)
@@ -205,13 +185,14 @@ local speedGui = Instance.new("ScreenGui")
 speedGui.Name = "SpeedDisplay"
 speedGui.ResetOnSpawn = false
 speedGui.IgnoreGuiInset = true
-speedGui.Parent = game:GetService("CoreGui")
+pcall(function() speedGui.Parent = game:GetService("CoreGui") end)
+if not speedGui.Parent then speedGui.Parent = LocalPlayer:WaitForChild("PlayerGui") end
 
 local speedLabel = Instance.new("TextLabel")
 speedLabel.Size = UDim2.new(0, 300, 0, 40)
 speedLabel.Position = UDim2.new(0.5, -150, 0, 10)
 speedLabel.BackgroundTransparency = 1
-speedLabel.Text = "SPEED: 0 S/s"
+speedLabel.Text = "SPEED: 0.0 S/s"
 speedLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 speedLabel.TextSize = 20
 speedLabel.Font = Enum.Font.GothamBold
@@ -223,60 +204,65 @@ speedLabel.Parent = speedGui
 local speedDisplayOn = false
 local hue = 0
 
--- ===== SMOOTH SPEED =====
+-- ===== SMOOTH SPEED (BV + BG, KHÔNG KHÓA HƯỚNG) =====
 local bv = nil
+local bg = nil
 local smoothOn = false
 
 local function setupBV()
     if bv then bv:Destroy() end
+    if bg then bg:Destroy() end
     if not rootPart or not rootPart.Parent then return end
+
     bv = Instance.new("BodyVelocity")
-    bv.MaxForce = Vector3.new(1e9, 0, 1e9)
+    bv.MaxForce = Vector3.new(1e5, 0, 1e5)
     bv.Velocity = Vector3.new(0, 0, 0)
-    bv.P = 1250
+    bv.P = 500
     bv.Parent = rootPart
+
+    bg = Instance.new("BodyGyro")
+    bg.MaxTorque = Vector3.new(0, 1e5, 0)
+    bg.P = 3000
+    bg.D = 500
+    bg.CFrame = rootPart.CFrame
+    bg.Parent = rootPart
+
+    if humanoid and humanoid.Parent then
+        humanoid.WalkSpeed = 0
+        humanoid.AutoRotate = false
+    end
 end
 
 local function destroyBV()
     if bv then bv:Destroy(); bv = nil end
+    if bg then bg:Destroy(); bg = nil end
+    if humanoid and humanoid.Parent then
+        humanoid.WalkSpeed = state.speed
+        humanoid.AutoRotate = true
+    end
 end
 
 -- ===== TRAIL =====
 local trailOn = false
 local currentTrail = nil
-local trailHue = 0
 
 local function createTrail()
     pcall(function()
         if not rootPart or not rootPart.Parent then return end
         if currentTrail then currentTrail:Destroy() end
-
         for _, v in ipairs(rootPart:GetChildren()) do
-            if v.Name == "TrailAtt0" or v.Name == "TrailAtt1" then
-                v:Destroy()
-            end
+            if v.Name == "TrailAtt0" or v.Name == "TrailAtt1" then v:Destroy() end
         end
-
-        local a0 = Instance.new("Attachment")
-        a0.Name = "TrailAtt0"
-        a0.Position = Vector3.new(0, 0.5, 0)
-        a0.Parent = rootPart
-
-        local a1 = Instance.new("Attachment")
-        a1.Name = "TrailAtt1"
-        a1.Position = Vector3.new(0, -0.5, 0)
-        a1.Parent = rootPart
-
+        local a0 = Instance.new("Attachment"); a0.Name = "TrailAtt0"; a0.Position = Vector3.new(0, 0.5, 0); a0.Parent = rootPart
+        local a1 = Instance.new("Attachment"); a1.Name = "TrailAtt1"; a1.Position = Vector3.new(0, -0.5, 0); a1.Parent = rootPart
         local t = Instance.new("Trail")
         t.Name = "CharTrail"
-        t.Attachment0 = a0
-        t.Attachment1 = a1
-        t.Lifetime = 1.5
-        t.MinLength = 0
+        t.Attachment0 = a0; t.Attachment1 = a1
+        t.Lifetime = 1.5; t.MinLength = 0
         t.Color = ColorSequence.new({
-            ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 255, 255)),
-            ColorSequenceKeypoint.new(0.5, Color3.fromRGB(0, 0, 0)),
-            ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 255, 255))
+            ColorSequenceKeypoint.new(0, Color3.fromRGB(255,255,255)),
+            ColorSequenceKeypoint.new(0.5, Color3.fromRGB(0,0,0)),
+            ColorSequenceKeypoint.new(1, Color3.fromRGB(255,255,255))
         })
         t.Transparency = NumberSequence.new({
             NumberSequenceKeypoint.new(0, 0),
@@ -289,38 +275,57 @@ local function createTrail()
         })
         t.FaceCamera = true
         t.Parent = rootPart
-
         currentTrail = t
     end)
 end
 
 local function removeTrail()
     pcall(function()
-        if currentTrail then
-            currentTrail:Destroy()
-            currentTrail = nil
-        end
+        if currentTrail then currentTrail:Destroy(); currentTrail = nil end
         if rootPart and rootPart.Parent then
             for _, v in ipairs(rootPart:GetChildren()) do
-                if v.Name == "TrailAtt0" or v.Name == "TrailAtt1" then
-                    v:Destroy()
-                end
+                if v.Name == "TrailAtt0" or v.Name == "TrailAtt1" then v:Destroy() end
             end
         end
     end)
 end
 
+-- ===== MAIN HEARTBEAT =====
+RunService.Heartbeat:Connect(function(dt)
+    if smoothOn and bv and bg and humanoid and humanoid.Parent and rootPart then
+        local moveDir = humanoid.MoveDirection
+        if moveDir.Magnitude > 0.01 then
+            bv.Velocity = Vector3.new(moveDir.X * state.smoothSpeed, 0, moveDir.Z * state.smoothSpeed)
+            local lookAt = Vector3.new(moveDir.X, 0, moveDir.Z)
+            if lookAt.Magnitude > 0.01 then
+                bg.CFrame = CFrame.lookAt(rootPart.Position, rootPart.Position + lookAt)
+            end
+        else
+            bv.Velocity = Vector3.new(0, 0, 0)
+            bg.CFrame = rootPart.CFrame
+        end
+    end
+
+    if speedDisplayOn then
+        local speed = 0
+        if rootPart and rootPart.Parent then
+            local v = rootPart.AssemblyLinearVelocity
+            speed = math.sqrt(v.X * v.X + v.Z * v.Z)
+        end
+        speedLabel.Text = string.format("SPEED: %.1f S/s", speed)
+        hue = (hue + dt * 0.5) % 1
+        speedLabel.TextColor3 = Color3.fromHSV(hue, 1, 1)
+    end
+end)
+
 -- ===== GUI =====
 local gui = Instance.new("ScreenGui")
-gui.Name = "LonelyHub_" .. tostring(math.random(1000,9999))
+gui.Name = "LonelyHub"
 gui.ResetOnSpawn = false
 gui.IgnoreGuiInset = false
 gui.DisplayOrder = 999
-
 local ok = pcall(function() gui.Parent = game:GetService("CoreGui") end)
-if not ok or not gui.Parent then
-    gui.Parent = LocalPlayer:WaitForChild("PlayerGui")
-end
+if not ok or not gui.Parent then gui.Parent = LocalPlayer:WaitForChild("PlayerGui") end
 
 local icon = Instance.new("TextButton")
 icon.Size = UDim2.new(0, 44, 0, 44)
@@ -362,9 +367,7 @@ main.ZIndex = 50
 main.Parent = gui
 Instance.new("UICorner", main).CornerRadius = UDim.new(0, 16)
 local mainStroke = Instance.new("UIStroke", main)
-mainStroke.Color = Color3.fromRGB(255, 255, 255)
-mainStroke.Thickness = 1.5
-mainStroke.Transparency = 0.4
+mainStroke.Color = Color3.fromRGB(255, 255, 255); mainStroke.Thickness = 1.5; mainStroke.Transparency = 0.4
 
 local header = Instance.new("Frame")
 header.Size = UDim2.new(1, 0, 0, 50)
@@ -410,31 +413,21 @@ subtitle.ZIndex = 52
 subtitle.Parent = header
 
 local hubDragStart, hubStartPos, hubDragging = nil, nil, false
-
 header.InputBegan:Connect(function(input)
     if isDraggingSlider then return end
     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-        hubDragging = true
-        hubDragStart = input.Position
-        hubStartPos = main.Position
+        hubDragging = true; hubDragStart = input.Position; hubStartPos = main.Position
     end
 end)
-
 UserInput.InputChanged:Connect(function(input)
     if not hubDragging then return end
     if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
         local delta = input.Position - hubDragStart
-        main.Position = UDim2.new(
-            hubStartPos.X.Scale, hubStartPos.X.Offset + delta.X,
-            hubStartPos.Y.Scale, hubStartPos.Y.Offset + delta.Y
-        )
+        main.Position = UDim2.new(hubStartPos.X.Scale, hubStartPos.X.Offset + delta.X, hubStartPos.Y.Scale, hubStartPos.Y.Offset + delta.Y)
     end
 end)
-
 UserInput.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-        hubDragging = false
-    end
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then hubDragging = false end
 end)
 
 local btnMin = Instance.new("TextButton")
@@ -444,7 +437,7 @@ btnMin.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
 btnMin.BackgroundTransparency = 0.75
 btnMin.BorderSizePixel = 0
 btnMin.Text = "-"
-btnMin.TextColor3 = Color3.fromRGB(0, 0, 0)
+btnMin.TextColor3 = Color3.fromRGB(255, 255, 255)
 btnMin.TextSize = 18
 btnMin.Font = HUB_FONT
 btnMin.ZIndex = 55
@@ -459,7 +452,7 @@ btnClose.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
 btnClose.BackgroundTransparency = 0.75
 btnClose.BorderSizePixel = 0
 btnClose.Text = "X"
-btnClose.TextColor3 = Color3.fromRGB(0, 0, 0)
+btnClose.TextColor3 = Color3.fromRGB(255, 255, 255)
 btnClose.TextSize = 16
 btnClose.Font = HUB_FONT
 btnClose.ZIndex = 55
@@ -519,9 +512,7 @@ local function makeSlider(name, default, min, max, step, callback)
     card.Parent = container
     Instance.new("UICorner", card).CornerRadius = UDim.new(0, 10)
     local cardStroke = Instance.new("UIStroke", card)
-    cardStroke.Color = Color3.fromRGB(255, 255, 255)
-    cardStroke.Thickness = 1
-    cardStroke.Transparency = 0.7
+    cardStroke.Color = Color3.fromRGB(255, 255, 255); cardStroke.Thickness = 1; cardStroke.Transparency = 0.7
 
     local lbl = Instance.new("TextLabel")
     lbl.Size = UDim2.new(0.35, 0, 0, 20)
@@ -609,8 +600,7 @@ local function makeSlider(name, default, min, max, step, callback)
         if isLocked then return end
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
             local knobCenterX = knob.AbsolutePosition.X + knob.AbsoluteSize.X / 2
-            local touchX = input.Position.X
-            if math.abs(touchX - knobCenterX) > 30 then return end
+            if math.abs(input.Position.X - knobCenterX) > 30 then return end
             if activeSlider ~= nil then return end
             activeSlider = track
             isDraggingSlider = true
@@ -650,10 +640,7 @@ local function makeSlider(name, default, min, max, step, callback)
         if enterPressed then textBox:ReleaseFocus() end
     end)
 
-    return {
-        set = function(v) setValue(v, false) end,
-        get = function() return currentVal end
-    }
+    return { set = function(v) setValue(v, false) end, get = function() return currentVal end }
 end
 
 local function makeToggle(name, defaultState, callback)
@@ -671,9 +658,7 @@ local function makeToggle(name, defaultState, callback)
     btn.Parent = container
     Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 10)
     local btnStroke = Instance.new("UIStroke", btn)
-    btnStroke.Color = Color3.fromRGB(255, 255, 255)
-    btnStroke.Thickness = 1
-    btnStroke.Transparency = 0.7
+    btnStroke.Color = Color3.fromRGB(255, 255, 255); btnStroke.Thickness = 1; btnStroke.Transparency = 0.7
 
     local on = defaultState or false
     if on then
@@ -704,15 +689,13 @@ local function makeToggle(name, defaultState, callback)
 end
 
 makeSection("> STATS")
-
-local speedSlider = makeSlider("SPEED", state.speed, 0, 500, 2, function(v) state.speed = v; applySpeed() end)
+local speedSlider = makeSlider("SPEED", state.speed, 0, 500, 2, function(v) state.speed = v; if not smoothOn then applySpeed() end end)
 local jumpSlider = makeSlider("JUMP", state.jump, 0, 500, 5, function(v) state.jump = v; applyJump() end)
 local gravSlider = makeSlider("GRAVITY", state.gravity, 0, 500, 10, function(v) state.gravity = v; applyGravity() end)
 local fovSlider = makeSlider("FOV", state.fov, 70, 160, 5, function(v) state.fov = v; applyFOV() end)
 local smoothSpeedSlider = makeSlider("SMOOTH SPD", state.smoothSpeed, 0, 500, 2, function(v) state.smoothSpeed = v end)
 
 makeSection("> ZOOM")
-
 local minZoomSlider = makeSlider("MIN ZOOM", state.minZoom, 0.5, 20, 0.5, function(v) state.minZoom = v end)
 local maxZoomSlider = makeSlider("MAX ZOOM", state.maxZoom, 0.5, 1000, 5, function(v) state.maxZoom = v end)
 
@@ -720,7 +703,7 @@ local unlockToggle = makeToggle("UNLOCK FPS", true, function(v)
     state.unlockFPS = v
     if not v then
         pcall(function()
-            LocalPlayer.CameraMode = Enum.CameraMode.LockFirstPerson
+            LocalPlayer.CameraMode = Enum.CameraMode.Classic
             LocalPlayer.CameraMinZoomDistance = 0.5
             LocalPlayer.CameraMaxZoomDistance = 0.5
         end)
@@ -728,7 +711,6 @@ local unlockToggle = makeToggle("UNLOCK FPS", true, function(v)
 end)
 
 makeSection("> HIDE BODY")
-
 local headToggle = makeToggle("HEAD", false, function(v) state.head = v end)
 local torsoToggle = makeToggle("TORSO", false, function(v) state.torso = v end)
 local armsToggle = makeToggle("ARMS", false, function(v) state.arms = v end)
@@ -740,12 +722,10 @@ local allHideToggle = makeToggle("ALL HIDE", false, function(v)
 end)
 
 makeSection("> LOCKS")
-
 local speedToggle = makeToggle("SPEED LOCK", true, function(v) state.speedOn = v end)
 local jumpToggle = makeToggle("JUMP LOCK", true, function(v) state.jumpOn = v end)
 
 makeSection("> TOGGLES")
-
 local infJumpOn = false
 local infJumpToggle = makeToggle("INF JUMP", false, function(v) infJumpOn = v end)
 
@@ -756,44 +736,35 @@ UserInput.JumpRequest:Connect(function()
     end
 end)
 
-local speedDisplayToggle = makeToggle("SPEED DISPLAY", false, function(v)
-    speedDisplayOn = v
-    speedLabel.Visible = v
-end)
+local speedDisplayToggle = makeToggle("SPEED DISPLAY", false, function(v) speedDisplayOn = v; speedLabel.Visible = v end)
 
 local smoothToggle = makeToggle("SMOOTH SPEED", false, function(v)
     smoothOn = v
     if v then
+        state.speedOn = false
+        if speedToggle then speedToggle.set(false) end
         setupBV()
-        humanoid.WalkSpeed = state.smoothSpeed
     else
         destroyBV()
-        humanoid.WalkSpeed = state.speed
+        state.speedOn = true
+        if speedToggle then speedToggle.set(true) end
     end
 end)
 
 local trailToggle = makeToggle("TRAIL", false, function(v)
     trailOn = v
-    if v then
-        createTrail()
-    else
-        removeTrail()
-    end
+    if v then createTrail() else removeTrail() end
 end)
 
 local autoPressToggle = makeToggle("AUTO PRESS C", false, function(v)
     autoPressOn = v
     timerLabel.Visible = v
-    if v then
-        autoPressTimeLeft = 300
-        autoPressAccumulated = 0
-    end
+    if v then autoPressTimeLeft = 300; autoPressAccumulated = 0 end
 end)
 
-local realClockToggle = makeToggle("REAL CLOCK", false, function(v)
-    clockLabel.Visible = v
-end)
+local realClockToggle = makeToggle("REAL CLOCK", false, function(v) clockLabel.Visible = v end)
 
+-- ===== ESP =====
 local espEnabled = false
 local espObjects = {}
 
@@ -803,7 +774,6 @@ local function createESP(player)
     if not player.Character then return end
     if not player.Character:FindFirstChild("Head") then return end
     local head = player.Character:FindFirstChild("Head")
-
     local billboard = Instance.new("BillboardGui")
     billboard.Name = "ESP_Name"
     billboard.Size = UDim2.new(0, 240, 0, 50)
@@ -825,9 +795,9 @@ local function createESP(player)
 
     local gradient = Instance.new("UIGradient")
     gradient.Color = ColorSequence.new({
-        ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 255, 255)),
-        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(160, 160, 160)),
-        ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 255, 255))
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(255,255,255)),
+        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(160,160,160)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(255,255,255))
     })
     gradient.Rotation = 90
     gradient.Parent = label
@@ -863,12 +833,10 @@ Players.PlayerRemoving:Connect(removeESP)
 
 local espToggle = makeToggle("ESP", false, function(v)
     espEnabled = v
-    if v then refreshESP()
-    else for player, _ in pairs(espObjects) do removeESP(player) end end
+    if v then refreshESP() else for player, _ in pairs(espObjects) do removeESP(player) end end
 end)
 
 makeSection("> UTILS")
-
 local lockBtn = Instance.new("TextButton")
 lockBtn.Size = UDim2.new(1, 0, 0, 40)
 lockBtn.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
@@ -935,17 +903,10 @@ btnReset.MouseButton1Click:Connect(function()
     realClockToggle.set(false); clockLabel.Visible = false
 end)
 
-btnMin.MouseButton1Click:Connect(function()
-    main.Visible = false
-    icon.Visible = true
-end)
-
-btnClose.MouseButton1Click:Connect(function()
-    gui:Destroy()
-end)
+btnMin.MouseButton1Click:Connect(function() main.Visible = false; icon.Visible = true end)
+btnClose.MouseButton1Click:Connect(function() gui:Destroy() end)
 
 local iconDragStart, iconStartPos, iconMoved = nil, nil, false
-
 icon.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
         iconDragStart = input.Position
@@ -953,27 +914,19 @@ icon.InputBegan:Connect(function(input)
         iconMoved = false
     end
 end)
-
 UserInput.InputChanged:Connect(function(input)
     if not iconDragStart then return end
     if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
         local delta = input.Position - iconDragStart
         if math.abs(delta.X) > 8 or math.abs(delta.Y) > 8 then iconMoved = true end
         if iconMoved then
-            icon.Position = UDim2.new(
-                iconStartPos.X.Scale, iconStartPos.X.Offset + delta.X,
-                iconStartPos.Y.Scale, iconStartPos.Y.Offset + delta.Y
-            )
+            icon.Position = UDim2.new(iconStartPos.X.Scale, iconStartPos.X.Offset + delta.X, iconStartPos.Y.Scale, iconStartPos.Y.Offset + delta.Y)
         end
     end
 end)
-
 UserInput.InputEnded:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-        if iconDragStart and not iconMoved then
-            main.Visible = true
-            icon.Visible = false
-        end
+        if iconDragStart and not iconMoved then main.Visible = true; icon.Visible = false end
         iconDragStart = nil
         iconMoved = false
     end
@@ -984,15 +937,8 @@ LocalPlayer.CharacterAdded:Connect(function(newChar)
     humanoid = newChar:WaitForChild("Humanoid")
     rootPart = newChar:WaitForChild("HumanoidRootPart")
     task.wait(0.5)
-    if smoothOn then
-        setupBV()
-        humanoid.WalkSpeed = state.smoothSpeed
-    else
-        applySpeed(); applyJump()
-    end
-    if trailOn then
-        createTrail()
-    end
+    if smoothOn then setupBV() else applySpeed(); applyJump() end
+    if trailOn then createTrail() end
     applyHide()
 end)
 
@@ -1004,13 +950,9 @@ task.spawn(function()
             if Camera.FieldOfView ~= state.fov then Camera.FieldOfView = state.fov end
             if humanoid and humanoid.Parent then
                 if smoothOn then
-                    if humanoid.WalkSpeed ~= state.smoothSpeed then
-                        humanoid.WalkSpeed = state.smoothSpeed
-                    end
+                    if humanoid.WalkSpeed ~= 0 then humanoid.WalkSpeed = 0 end
                 else
-                    if state.speedOn and humanoid.WalkSpeed ~= state.speed then
-                        humanoid.WalkSpeed = state.speed
-                    end
+                    if state.speedOn and humanoid.WalkSpeed ~= state.speed then humanoid.WalkSpeed = state.speed end
                 end
                 if state.jumpOn and humanoid.JumpPower ~= state.jump then
                     humanoid.JumpPower = state.jump
@@ -1022,4 +964,4 @@ task.spawn(function()
     end
 end)
 
-print("[Lonely Hub v83 Mobile] READY")
+print("[Lonely Hub v90] READY")
