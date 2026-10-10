@@ -1,7 +1,8 @@
 -- ============================================================
--- LONELY HUB v90 FINAL - FULL FIXED VERSION
--- Fix: Smooth Speed (BV+BG không khóa hướng), Speed Display
--- Không đổi tên ngẫu nhiên - giữ nguyên tên gốc
+-- LONELY HUB v83 FINAL - FULL FIXED VERSION
+-- Smooth Speed dùng BV + WalkSpeed (KHÔNG khóa hướng)
+-- Speed Display đo velocity thật
+-- Không đổi tên ngẫu nhiên
 -- ============================================================
 
 local Players = game:GetService("Players")
@@ -29,7 +30,7 @@ local character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
 local humanoid = character:WaitForChild("Humanoid")
 local rootPart = character:WaitForChild("HumanoidRootPart")
 
-local function applySpeed() if humanoid and humanoid.Parent and state.speedOn then humanoid.WalkSpeed = state.speed end end
+local function applySpeed() if humanoid and humanoid.Parent and state.speedOn and not smoothOn then humanoid.WalkSpeed = state.speed end end
 local function applyJump() if humanoid and humanoid.Parent and state.jumpOn then humanoid.JumpPower = state.jump; humanoid.UseJumpPower = true end end
 local function applyGravity() workspace.Gravity = state.gravity end
 local function applyFOV() Camera.FieldOfView = state.fov end
@@ -204,41 +205,27 @@ speedLabel.Parent = speedGui
 local speedDisplayOn = false
 local hue = 0
 
--- ===== SMOOTH SPEED (BV + BG, KHÔNG KHÓA HƯỚNG) =====
+-- ===== SMOOTH SPEED (BV + WalkSpeed - KHÔNG KHÓA HƯỚNG) =====
 local bv = nil
-local bg = nil
 local smoothOn = false
 
 local function setupBV()
     if bv then bv:Destroy() end
-    if bg then bg:Destroy() end
     if not rootPart or not rootPart.Parent then return end
-
     bv = Instance.new("BodyVelocity")
-    bv.MaxForce = Vector3.new(1e5, 0, 1e5)
+    bv.MaxForce = Vector3.new(1e9, 0, 1e9)
     bv.Velocity = Vector3.new(0, 0, 0)
-    bv.P = 500
+    bv.P = 1250
     bv.Parent = rootPart
-
-    bg = Instance.new("BodyGyro")
-    bg.MaxTorque = Vector3.new(0, 1e5, 0)
-    bg.P = 3000
-    bg.D = 500
-    bg.CFrame = rootPart.CFrame
-    bg.Parent = rootPart
-
     if humanoid and humanoid.Parent then
-        humanoid.WalkSpeed = 0
-        humanoid.AutoRotate = false
+        humanoid.WalkSpeed = state.smoothSpeed
     end
 end
 
 local function destroyBV()
     if bv then bv:Destroy(); bv = nil end
-    if bg then bg:Destroy(); bg = nil end
     if humanoid and humanoid.Parent then
         humanoid.WalkSpeed = state.speed
-        humanoid.AutoRotate = true
     end
 end
 
@@ -292,17 +279,12 @@ end
 
 -- ===== MAIN HEARTBEAT =====
 RunService.Heartbeat:Connect(function(dt)
-    if smoothOn and bv and bg and humanoid and humanoid.Parent and rootPart then
+    if smoothOn and bv and humanoid and humanoid.Parent and rootPart then
         local moveDir = humanoid.MoveDirection
         if moveDir.Magnitude > 0.01 then
             bv.Velocity = Vector3.new(moveDir.X * state.smoothSpeed, 0, moveDir.Z * state.smoothSpeed)
-            local lookAt = Vector3.new(moveDir.X, 0, moveDir.Z)
-            if lookAt.Magnitude > 0.01 then
-                bg.CFrame = CFrame.lookAt(rootPart.Position, rootPart.Position + lookAt)
-            end
         else
             bv.Velocity = Vector3.new(0, 0, 0)
-            bg.CFrame = rootPart.CFrame
         end
     end
 
@@ -693,7 +675,7 @@ local speedSlider = makeSlider("SPEED", state.speed, 0, 500, 2, function(v) stat
 local jumpSlider = makeSlider("JUMP", state.jump, 0, 500, 5, function(v) state.jump = v; applyJump() end)
 local gravSlider = makeSlider("GRAVITY", state.gravity, 0, 500, 10, function(v) state.gravity = v; applyGravity() end)
 local fovSlider = makeSlider("FOV", state.fov, 70, 160, 5, function(v) state.fov = v; applyFOV() end)
-local smoothSpeedSlider = makeSlider("SMOOTH SPD", state.smoothSpeed, 0, 500, 2, function(v) state.smoothSpeed = v end)
+local smoothSpeedSlider = makeSlider("SMOOTH SPD", state.smoothSpeed, 0, 500, 2, function(v) state.smoothSpeed = v; if smoothOn and humanoid and humanoid.Parent then humanoid.WalkSpeed = v end end)
 
 makeSection("> ZOOM")
 local minZoomSlider = makeSlider("MIN ZOOM", state.minZoom, 0.5, 20, 0.5, function(v) state.minZoom = v end)
@@ -950,7 +932,7 @@ task.spawn(function()
             if Camera.FieldOfView ~= state.fov then Camera.FieldOfView = state.fov end
             if humanoid and humanoid.Parent then
                 if smoothOn then
-                    if humanoid.WalkSpeed ~= 0 then humanoid.WalkSpeed = 0 end
+                    if humanoid.WalkSpeed ~= state.smoothSpeed then humanoid.WalkSpeed = state.smoothSpeed end
                 else
                     if state.speedOn and humanoid.WalkSpeed ~= state.speed then humanoid.WalkSpeed = state.speed end
                 end
@@ -964,4 +946,4 @@ task.spawn(function()
     end
 end)
 
-print("[Lonely Hub v90] READY")
+print("[Lonely Hub v83 FINAL] READY")
