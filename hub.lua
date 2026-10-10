@@ -1,5 +1,5 @@
 -- ============================================================
--- LONELY HUB v81 - AUTO PRESS C + REAL CLOCK
+-- LONELY HUB v83 - FULL + MIN/MAX ZOOM + UNLOCK FPS + HIDE BODY
 -- Speed 16 / Jump 50 / Gravity 190 / FOV 70 / Smooth 40
 -- ============================================================
 
@@ -17,7 +17,12 @@ local isDraggingSlider = false
 local isLocked = false
 local activeSlider = nil
 
-local state = { speed = 16, jump = 50, gravity = 190, fov = 70, smoothSpeed = 40, speedOn = true, jumpOn = true }
+local state = {
+    speed = 16, jump = 50, gravity = 190, fov = 70, smoothSpeed = 40,
+    speedOn = true, jumpOn = true,
+    minZoom = 0.5, maxZoom = 20, unlockFPS = true,
+    head = false, torso = false, arms = false, legs = false, accessories = false, allHide = false
+}
 
 local character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
 local humanoid = character:WaitForChild("Humanoid")
@@ -27,6 +32,100 @@ local function applySpeed() if humanoid and humanoid.Parent and state.speedOn th
 local function applyJump() if humanoid and humanoid.Parent and state.jumpOn then humanoid.JumpPower = state.jump; humanoid.UseJumpPower = true end end
 local function applyGravity() workspace.Gravity = state.gravity end
 local function applyFOV() Camera.FieldOfView = state.fov end
+local function applyZoom()
+    pcall(function()
+        LocalPlayer.CameraMinZoomDistance = state.minZoom
+        LocalPlayer.CameraMaxZoomDistance = state.maxZoom
+    end)
+end
+
+applyZoom()
+
+-- ===== UNLOCK FPS LOOP =====
+RunService.RenderStepped:Connect(function()
+    if not state.unlockFPS then return end
+    pcall(function()
+        LocalPlayer.CameraMode = Enum.CameraMode.Classic
+        Camera.CameraType = Enum.CameraType.Custom
+        if LocalPlayer.CameraMinZoomDistance ~= state.minZoom then
+            LocalPlayer.CameraMinZoomDistance = state.minZoom
+        end
+        if LocalPlayer.CameraMaxZoomDistance ~= state.maxZoom then
+            LocalPlayer.CameraMaxZoomDistance = state.maxZoom
+        end
+    end)
+end)
+
+-- ===== HIDE BODY LOGIC =====
+local function hidePart(part)
+    if part and part:IsA("BasePart") then
+        part.LocalTransparencyModifier = 1
+    end
+end
+
+local function showPart(part)
+    if part and part:IsA("BasePart") then
+        part.LocalTransparencyModifier = 0
+    end
+end
+
+local function applyHide()
+    if not character or not character.Parent then return end
+
+    local head = character:FindFirstChild("Head")
+    if head then
+        if state.head or state.allHide then hidePart(head) else showPart(head) end
+    end
+
+    local torso = character:FindFirstChild("Torso")
+    local upperTorso = character:FindFirstChild("UpperTorso")
+    local lowerTorso = character:FindFirstChild("LowerTorso")
+    if state.torso or state.allHide then
+        if torso then hidePart(torso) end
+        if upperTorso then hidePart(upperTorso) end
+        if lowerTorso then hidePart(lowerTorso) end
+    else
+        if torso then showPart(torso) end
+        if upperTorso then showPart(upperTorso) end
+        if lowerTorso then showPart(lowerTorso) end
+    end
+
+    local leftArm = character:FindFirstChild("Left Arm") or character:FindFirstChild("LeftArm")
+    local rightArm = character:FindFirstChild("Right Arm") or character:FindFirstChild("RightArm")
+    if state.arms or state.allHide then
+        if leftArm then hidePart(leftArm) end
+        if rightArm then hidePart(rightArm) end
+    else
+        if leftArm then showPart(leftArm) end
+        if rightArm then showPart(rightArm) end
+    end
+
+    local leftLeg = character:FindFirstChild("Left Leg") or character:FindFirstChild("LeftLeg")
+    local rightLeg = character:FindFirstChild("Right Leg") or character:FindFirstChild("RightLeg")
+    if state.legs or state.allHide then
+        if leftLeg then hidePart(leftLeg) end
+        if rightLeg then hidePart(rightLeg) end
+    else
+        if leftLeg then showPart(leftLeg) end
+        if rightLeg then showPart(rightLeg) end
+    end
+
+    for _, acc in ipairs(character:GetChildren()) do
+        if acc:IsA("Accessory") then
+            local handle = acc:FindFirstChild("Handle")
+            if handle then
+                if state.accessories or state.allHide then hidePart(handle) else showPart(handle) end
+            end
+        end
+    end
+end
+
+applyHide()
+
+RunService.Heartbeat:Connect(function()
+    if not character or not character.Parent then return end
+    applyHide()
+end)
 
 -- ===== TIMER GUI =====
 local timerGui = Instance.new("ScreenGui")
@@ -35,7 +134,6 @@ timerGui.ResetOnSpawn = false
 timerGui.IgnoreGuiInset = true
 timerGui.Parent = game:GetService("CoreGui")
 
--- Auto press timer (trên)
 local autoPressOn = false
 local autoPressTimeLeft = 300
 local autoPressAccumulated = 0
@@ -54,7 +152,6 @@ timerLabel.TextXAlignment = Enum.TextXAlignment.Right
 timerLabel.Visible = false
 timerLabel.Parent = timerGui
 
--- Real clock (dưới)
 local clockLabel = Instance.new("TextLabel")
 clockLabel.Size = UDim2.new(0, 120, 0, 30)
 clockLabel.Position = UDim2.new(1, -130, 0, 45)
@@ -147,6 +244,7 @@ end
 -- ===== TRAIL =====
 local trailOn = false
 local currentTrail = nil
+local trailHue = 0
 
 local function createTrail()
     pcall(function()
@@ -173,12 +271,12 @@ local function createTrail()
         t.Name = "CharTrail"
         t.Attachment0 = a0
         t.Attachment1 = a1
-        t.Lifetime = 0.5
+        t.Lifetime = 1.5
         t.MinLength = 0
         t.Color = ColorSequence.new({
             ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 255, 255)),
-            ColorSequenceKeypoint.new(0.5, Color3.fromRGB(80, 80, 80)),
-            ColorSequenceKeypoint.new(1, Color3.fromRGB(0, 0, 0))
+            ColorSequenceKeypoint.new(0.5, Color3.fromRGB(0, 0, 0)),
+            ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 255, 255))
         })
         t.Transparency = NumberSequence.new({
             NumberSequenceKeypoint.new(0, 0),
@@ -211,20 +309,6 @@ local function removeTrail()
         end
     end)
 end
-
-RunService.Heartbeat:Connect(function(dt)
-    if smoothOn and bv and humanoid and humanoid.Parent and rootPart then
-        local moveDir = humanoid.MoveDirection
-        bv.Velocity = Vector3.new(moveDir.X * state.smoothSpeed, 0, moveDir.Z * state.smoothSpeed)
-    end
-    if speedDisplayOn and rootPart and rootPart.Parent then
-        local v = rootPart.AssemblyLinearVelocity
-        local speed = math.sqrt(v.X^2 + v.Z^2)
-        speedLabel.Text = string.format("SPEED: %.1f S/s", speed)
-        hue = (hue + dt * 0.5) % 1
-        speedLabel.TextColor3 = Color3.fromHSV(hue, 1, 1)
-    end
-end)
 
 -- ===== GUI =====
 local gui = Instance.new("ScreenGui")
@@ -267,8 +351,8 @@ task.spawn(function()
 end)
 
 local main = Instance.new("Frame")
-main.Size = UDim2.new(0, 420, 0, 380)
-main.Position = UDim2.new(0.5, -210, 0.5, -190)
+main.Size = UDim2.new(0, 420, 0, 460)
+main.Position = UDim2.new(0.5, -210, 0.5, -230)
 main.BackgroundColor3 = Color3.fromRGB(12, 12, 14)
 main.BackgroundTransparency = 0.15
 main.BorderSizePixel = 0
@@ -317,7 +401,7 @@ local subtitle = Instance.new("TextLabel")
 subtitle.Size = UDim2.new(0, 80, 1, 0)
 subtitle.Position = UDim2.new(1, -100, 0, 0)
 subtitle.BackgroundTransparency = 1
-subtitle.Text = "HUB v81"
+subtitle.Text = "HUB v83"
 subtitle.TextColor3 = Color3.fromRGB(80, 80, 80)
 subtitle.TextSize = 11
 subtitle.Font = Enum.Font.Gotham
@@ -627,6 +711,34 @@ local gravSlider = makeSlider("GRAVITY", state.gravity, 0, 500, 10, function(v) 
 local fovSlider = makeSlider("FOV", state.fov, 70, 160, 5, function(v) state.fov = v; applyFOV() end)
 local smoothSpeedSlider = makeSlider("SMOOTH SPD", state.smoothSpeed, 0, 500, 2, function(v) state.smoothSpeed = v end)
 
+makeSection("> ZOOM")
+
+local minZoomSlider = makeSlider("MIN ZOOM", state.minZoom, 0.5, 20, 0.5, function(v) state.minZoom = v end)
+local maxZoomSlider = makeSlider("MAX ZOOM", state.maxZoom, 0.5, 1000, 5, function(v) state.maxZoom = v end)
+
+local unlockToggle = makeToggle("UNLOCK FPS", true, function(v)
+    state.unlockFPS = v
+    if not v then
+        pcall(function()
+            LocalPlayer.CameraMode = Enum.CameraMode.LockFirstPerson
+            LocalPlayer.CameraMinZoomDistance = 0.5
+            LocalPlayer.CameraMaxZoomDistance = 0.5
+        end)
+    end
+end)
+
+makeSection("> HIDE BODY")
+
+local headToggle = makeToggle("HEAD", false, function(v) state.head = v end)
+local torsoToggle = makeToggle("TORSO", false, function(v) state.torso = v end)
+local armsToggle = makeToggle("ARMS", false, function(v) state.arms = v end)
+local legsToggle = makeToggle("LEGS", false, function(v) state.legs = v end)
+local accToggle = makeToggle("ACCESSORIES", false, function(v) state.accessories = v end)
+local allHideToggle = makeToggle("ALL HIDE", false, function(v)
+    state.allHide = v
+    headToggle.set(v); torsoToggle.set(v); armsToggle.set(v); legsToggle.set(v); accToggle.set(v)
+end)
+
 makeSection("> LOCKS")
 
 local speedToggle = makeToggle("SPEED LOCK", true, function(v) state.speedOn = v end)
@@ -801,8 +913,17 @@ btnReset.MouseButton1Click:Connect(function()
     gravSlider.set(190); state.gravity = 190; applyGravity()
     fovSlider.set(70); state.fov = 70; applyFOV()
     smoothSpeedSlider.set(40); state.smoothSpeed = 40
+    minZoomSlider.set(0.5); state.minZoom = 0.5
+    maxZoomSlider.set(20); state.maxZoom = 20
     speedToggle.set(true); state.speedOn = true
     jumpToggle.set(true); state.jumpOn = true
+    unlockToggle.set(true); state.unlockFPS = true
+    headToggle.set(false); state.head = false
+    torsoToggle.set(false); state.torso = false
+    armsToggle.set(false); state.arms = false
+    legsToggle.set(false); state.legs = false
+    accToggle.set(false); state.accessories = false
+    allHideToggle.set(false); state.allHide = false
     infJumpToggle.set(false); infJumpOn = false
     speedDisplayToggle.set(false); speedDisplayOn = false; speedLabel.Visible = false
     smoothToggle.set(false); smoothOn = false
@@ -823,7 +944,6 @@ btnClose.MouseButton1Click:Connect(function()
     gui:Destroy()
 end)
 
--- ===== ICON: BẤM MỞ HUB + KÉO DI CHUYỂN =====
 local iconDragStart, iconStartPos, iconMoved = nil, nil, false
 
 icon.InputBegan:Connect(function(input)
@@ -873,9 +993,10 @@ LocalPlayer.CharacterAdded:Connect(function(newChar)
     if trailOn then
         createTrail()
     end
+    applyHide()
 end)
 
-applySpeed(); applyJump(); applyGravity(); applyFOV()
+applySpeed(); applyJump(); applyGravity(); applyFOV(); applyZoom()
 
 task.spawn(function()
     while task.wait(1) do
@@ -901,4 +1022,4 @@ task.spawn(function()
     end
 end)
 
-print("[Lonely Hub v81 Mobile] READY")
+print("[Lonely Hub v83 Mobile] READY")
