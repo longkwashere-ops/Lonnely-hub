@@ -1,8 +1,7 @@
 -- ============================================================
--- LONELY HUB v83 FINAL - FULL FIXED VERSION
--- Smooth Speed dùng BV + WalkSpeed (KHÔNG khóa hướng)
--- Speed Display đo velocity thật
--- Không đổi tên ngẫu nhiên
+-- LONELY HUB v83 FINAL + HIDE GAME UI (KHÔNG ẨN HUB)
+-- Smooth Speed (BV + WalkSpeed - không khóa hướng)
+-- Speed Display + Hide UI + ESP
 -- ============================================================
 
 local Players = game:GetService("Players")
@@ -205,7 +204,7 @@ speedLabel.Parent = speedGui
 local speedDisplayOn = false
 local hue = 0
 
--- ===== SMOOTH SPEED (BV + WalkSpeed - KHÔNG KHÓA HƯỚNG) =====
+-- ===== SMOOTH SPEED =====
 local bv = nil
 local smoothOn = false
 
@@ -275,6 +274,41 @@ local function removeTrail()
             end
         end
     end)
+end
+
+-- ===== HIDE GAME UI (KHÔNG ẨN HUB) =====
+local hideUIOn = false
+local hideUISaved = {}
+
+local function isKeep(g)
+    local n = g.Name:lower()
+    if g.Name == "TouchGui" then return true end
+    if n:find("joystick") or n:find("jump") or n:find("chat") then return true end
+    if g.Name == "LonelyHub" then return true end
+    if g.Name == "TimerDisplay" then return true end
+    if g.Name == "SpeedDisplay" then return true end
+    return false
+end
+
+local function applyHideUI()
+    if hideUIOn then hideUISaved = {} end
+    local function scan(parent)
+        for _, g in ipairs(parent:GetChildren()) do
+            if g:IsA("ScreenGui") and not isKeep(g) then
+                if hideUIOn then
+                    hideUISaved[g] = g.Enabled
+                    g.Enabled = false
+                else
+                    if hideUISaved[g] ~= nil then
+                        g.Enabled = hideUISaved[g]
+                        hideUISaved[g] = nil
+                    end
+                end
+            end
+        end
+    end
+    pcall(function() scan(LocalPlayer.PlayerGui) end)
+    pcall(function() scan(game:GetService("CoreGui")) end)
 end
 
 -- ===== MAIN HEARTBEAT =====
@@ -746,6 +780,11 @@ end)
 
 local realClockToggle = makeToggle("REAL CLOCK", false, function(v) clockLabel.Visible = v end)
 
+local hideUIToggle = makeToggle("HIDE GAME UI", false, function(v)
+    hideUIOn = v
+    applyHideUI()
+end)
+
 -- ===== ESP =====
 local espEnabled = false
 local espObjects = {}
@@ -883,6 +922,7 @@ btnReset.MouseButton1Click:Connect(function()
     autoPressToggle.set(false); autoPressOn = false; timerLabel.Visible = false
     autoPressTimeLeft = 300
     realClockToggle.set(false); clockLabel.Visible = false
+    hideUIToggle.set(false); hideUIOn = false; applyHideUI()
 end)
 
 btnMin.MouseButton1Click:Connect(function() main.Visible = false; icon.Visible = true end)
