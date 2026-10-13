@@ -1,7 +1,5 @@
 -- ============================================================
--- LONELY HUB v83 FINAL + HIDE GAME UI (KHÔNG ẨN HUB)
--- Smooth Speed (BV + WalkSpeed - không khóa hướng)
--- Speed Display + Hide UI + ESP
+-- LONELY HUB v83 FINAL + HIDE UI + SESSION TIMER
 -- ============================================================
 
 local Players = game:GetService("Players")
@@ -121,6 +119,7 @@ if not timerGui.Parent then timerGui.Parent = LocalPlayer:WaitForChild("PlayerGu
 local autoPressOn = false
 local autoPressTimeLeft = 300
 local autoPressAccumulated = 0
+local sessionStart = tick()
 
 local timerLabel = Instance.new("TextLabel")
 timerLabel.Size = UDim2.new(0, 100, 0, 30)
@@ -150,6 +149,21 @@ clockLabel.TextXAlignment = Enum.TextXAlignment.Right
 clockLabel.Visible = false
 clockLabel.Parent = timerGui
 
+-- LABEL SESSION TIME (HÀNG THỨ 3)
+local sessionLabel = Instance.new("TextLabel")
+sessionLabel.Size = UDim2.new(0, 120, 0, 30)
+sessionLabel.Position = UDim2.new(1, -130, 0, 80)
+sessionLabel.BackgroundTransparency = 1
+sessionLabel.Text = "00:00:00"
+sessionLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+sessionLabel.TextSize = 22
+sessionLabel.Font = Enum.Font.GothamBold
+sessionLabel.TextStrokeTransparency = 0
+sessionLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+sessionLabel.TextXAlignment = Enum.TextXAlignment.Right
+sessionLabel.Visible = false
+sessionLabel.Parent = timerGui
+
 local function pressC()
     pcall(function()
         VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.C, false, game)
@@ -177,6 +191,13 @@ RunService.Heartbeat:Connect(function(dt)
     if clockLabel.Visible then
         local t = os.date("*t")
         clockLabel.Text = string.format("%02d:%02d:%02d", t.hour, t.min, t.sec)
+    end
+    if sessionLabel.Visible then
+        local elapsed = tick() - sessionStart
+        local h = math.floor(elapsed / 3600)
+        local m = math.floor((elapsed % 3600) / 60)
+        local s = math.floor(elapsed % 60)
+        sessionLabel.Text = string.format("%02d:%02d:%02d", h, m, s)
     end
 end)
 
@@ -276,7 +297,7 @@ local function removeTrail()
     end)
 end
 
--- ===== HIDE GAME UI (KHÔNG ẨN HUB) =====
+-- ===== HIDE GAME UI =====
 local hideUIOn = false
 local hideUISaved = {}
 
@@ -780,6 +801,8 @@ end)
 
 local realClockToggle = makeToggle("REAL CLOCK", false, function(v) clockLabel.Visible = v end)
 
+local sessionTimeToggle = makeToggle("SESSION TIME", false, function(v) sessionLabel.Visible = v end)
+
 local hideUIToggle = makeToggle("HIDE GAME UI", false, function(v)
     hideUIOn = v
     applyHideUI()
@@ -922,6 +945,7 @@ btnReset.MouseButton1Click:Connect(function()
     autoPressToggle.set(false); autoPressOn = false; timerLabel.Visible = false
     autoPressTimeLeft = 300
     realClockToggle.set(false); clockLabel.Visible = false
+    sessionTimeToggle.set(false); sessionLabel.Visible = false
     hideUIToggle.set(false); hideUIOn = false; applyHideUI()
 end)
 
