@@ -1,5 +1,5 @@
 -- ============================================================
--- LONELY HUB v83 FINAL + HIDE UI + SESSION TIMER
+-- LONELY HUB v83 FINAL - KEYBIND G + NÚT X ẨN HẾT
 -- ============================================================
 
 local Players = game:GetService("Players")
@@ -149,7 +149,6 @@ clockLabel.TextXAlignment = Enum.TextXAlignment.Right
 clockLabel.Visible = false
 clockLabel.Parent = timerGui
 
--- LABEL SESSION TIME (HÀNG THỨ 3)
 local sessionLabel = Instance.new("TextLabel")
 sessionLabel.Size = UDim2.new(0, 120, 0, 30)
 sessionLabel.Position = UDim2.new(1, -130, 0, 80)
@@ -949,8 +948,31 @@ btnReset.MouseButton1Click:Connect(function()
     hideUIToggle.set(false); hideUIOn = false; applyHideUI()
 end)
 
-btnMin.MouseButton1Click:Connect(function() main.Visible = false; icon.Visible = true end)
-btnClose.MouseButton1Click:Connect(function() gui:Destroy() end)
+-- ===== NÚT MIN: ẩn hub, hiện icon =====
+btnMin.MouseButton1Click:Connect(function()
+    main.Visible = false
+    icon.Visible = true
+end)
+
+-- ===== NÚT X: ẩn hết (hub + icon) =====
+btnClose.MouseButton1Click:Connect(function()
+    main.Visible = false
+    icon.Visible = false
+end)
+
+-- ===== KEYBIND G: mở/ẩn hub =====
+UserInput.InputBegan:Connect(function(input, gp)
+    if gp then return end
+    if input.KeyCode == Enum.KeyCode.G then
+        if main.Visible then
+            main.Visible = false
+            icon.Visible = false
+        else
+            main.Visible = true
+            icon.Visible = false
+        end
+    end
+end)
 
 local iconDragStart, iconStartPos, iconMoved = nil, nil, false
 icon.InputBegan:Connect(function(input)
