@@ -1,5 +1,5 @@
 -- ============================================================
--- LONELY HUB v83 - SIDEBAR FULL (ANTI MULTI-TOUCH)
+-- LONELY HUB v83 - SIDEBAR FULL (FIX INF JUMP + TELEPORT)
 -- ============================================================
 
 local Players = game:GetService("Players")
@@ -41,6 +41,7 @@ local function applyGravity() if state.gravityOn then workspace.Gravity = state.
 local function applyFOV() if state.fovOn then Camera.FieldOfView = state.fov end end
 local function applyZoom() if state.zoomOn then pcall(function() LocalPlayer.CameraMinZoomDistance = state.minZoom; LocalPlayer.CameraMaxZoomDistance = state.maxZoom end) end end
 
+-- UNLOCK FPS
 RunService.RenderStepped:Connect(function()
     if not state.unlockFPS then return end
     pcall(function()
@@ -49,6 +50,7 @@ RunService.RenderStepped:Connect(function()
     end)
 end)
 
+-- HIDE BODY
 local function hidePart(part) if part and part:IsA("BasePart") then part.LocalTransparencyModifier = 1 end end
 local function showPart(part) if part and part:IsA("BasePart") then part.LocalTransparencyModifier = 0 end end
 local function applyHide()
@@ -64,6 +66,7 @@ end
 applyHide()
 RunService.Heartbeat:Connect(function() if character and character.Parent then applyHide() end end)
 
+-- SMOOTH SPEED
 local bv = nil
 local function setupBV()
     if bv then bv:Destroy() end
@@ -82,6 +85,7 @@ RunService.Heartbeat:Connect(function()
     end
 end)
 
+-- TRAIL
 local currentTrail = nil
 local function createTrail()
     pcall(function()
@@ -104,6 +108,7 @@ local function removeTrail()
     end)
 end
 
+-- ESP
 local espObjects = {}
 local function createESP(player)
     if player == LocalPlayer then return end
@@ -129,9 +134,7 @@ local function hookPlayer(player)
     if player == LocalPlayer then return end
     player.CharacterAdded:Connect(function()
         task.wait(0.5)
-        if state.espOn then
-            if state.targetName == "" or string.find(player.Name:lower(), state.targetName:lower()) then createESP(player) end
-        end
+        if state.espOn then if state.targetName == "" or string.find(player.Name:lower(), state.targetName:lower()) then createESP(player) end end
     end)
     player.CharacterRemoving:Connect(function() removeESP(player) end)
 end
@@ -139,6 +142,20 @@ for _, player in ipairs(Players:GetPlayers()) do hookPlayer(player) end
 Players.PlayerAdded:Connect(hookPlayer)
 Players.PlayerRemoving:Connect(removeESP)
 
+-- TELEPORT LOGIC
+local function teleportToPlayer(targetName)
+    local targetPlayer = nil
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p.Name:lower() == targetName:lower() or string.find(p.Name:lower(), targetName:lower()) then targetPlayer = p; break end
+    end
+    if targetPlayer and targetPlayer.Character then
+        local targetRoot = targetPlayer.Character:FindFirstChild("HumanoidRootPart")
+        local myRoot = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+        if targetRoot and myRoot then myRoot.CFrame = CFrame.new(targetRoot.Position + Vector3.new(0, 0, 3)) end
+    end
+end
+
+-- TIMER & OVERLAYS
 local overlayGui = Instance.new("ScreenGui"); overlayGui.Name = "Overlays"; overlayGui.ResetOnSpawn = false; overlayGui.IgnoreGuiInset = true
 pcall(function() overlayGui.Parent = game:GetService("CoreGui") end); if not overlayGui.Parent then overlayGui.Parent = LocalPlayer:WaitForChild("PlayerGui") end
 local autoPressTimeLeft, autoPressAccumulated = 300, 0
@@ -173,6 +190,13 @@ RunService.Heartbeat:Connect(function(dt)
     end
     if state.statsDisplayOn and character and humanoid then
         lblSpeed.Text = string.format("Speed: %.0f", humanoid.WalkSpeed); lblJump.Text = string.format("Jump: %.0f", humanoid.JumpPower); lblGrav.Text = string.format("Grav: %.0f", workspace.Gravity); lblFov.Text = string.format("FOV: %.0f", Camera.FieldOfView)
+    end
+end)
+
+-- INF JUMP (FIX)
+UserInput.JumpRequest:Connect(function()
+    if state.infJumpOn and humanoid and humanoid.Parent then
+        humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
     end
 end)
 
@@ -323,6 +347,7 @@ tabVisuals.MouseButton1Click:Connect(function()
     end)
 end)
 
+-- TAB ESP
 local tabESP = makeTab("ESP", "👁️")
 tabESP.MouseButton1Click:Connect(function()
     selectTab(tabESP, function()
@@ -347,6 +372,36 @@ tabESP.MouseButton1Click:Connect(function()
             end
         end
         updateList(); Players.PlayerAdded:Connect(function() task.wait(1); updateList() end); Players.PlayerRemoving:Connect(function() task.wait(1); updateList() end)
+    end)
+end)
+
+-- TAB TELEPORT
+local tabTeleport = makeTab("Teleport", "📍")
+tabTeleport.MouseButton1Click:Connect(function()
+    selectTab(tabTeleport, function()
+        local tpBox = Instance.new("TextBox"); tpBox.Size = UDim2.new(1, 0, 0, 40); tpBox.BackgroundColor3 = Color3.fromRGB(20, 20, 22); tpBox.BorderSizePixel = 0; tpBox.PlaceholderText = "Nhập tên để dịch chuyển..."; tpBox.PlaceholderColor3 = Color3.fromRGB(150, 150, 150); tpBox.Text = ""; tpBox.TextColor3 = TEXT_WHITE; tpBox.TextSize = 14; tpBox.Font = HUB_FONT; tpBox.ZIndex = 52; tpBox.Parent = contentArea
+        Instance.new("UICorner", tpBox).CornerRadius = UDim.new(0, 10)
+        
+        local tpBtn = Instance.new("TextButton"); tpBtn.Size = UDim2.new(1, 0, 0, 40); tpBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 0); tpBtn.BorderSizePixel = 0; tpBtn.Text = "TELEPORT"; tpBtn.TextColor3 = TEXT_WHITE; tpBtn.TextSize = 14; tpBtn.Font = HUB_FONT; tpBtn.ZIndex = 52; tpBtn.Parent = contentArea
+        Instance.new("UICorner", tpBtn).CornerRadius = UDim.new(0, 10)
+        tpBtn.MouseButton1Click:Connect(function() if tpBox.Text ~= "" then teleportToPlayer(tpBox.Text) end end)
+
+        local tpListTitle = Instance.new("TextLabel"); tpListTitle.Size = UDim2.new(1, 0, 0, 20); tpListTitle.BackgroundTransparency = 1; tpListTitle.Text = "DANH SÁCH NGƯỜI CHƠI"; tpListTitle.TextColor3 = Color3.fromRGB(180, 180, 180); tpListTitle.TextSize = 12; tpListTitle.Font = HUB_FONT; tpListTitle.ZIndex = 52; tpListTitle.Parent = contentArea
+        local tpScrollList = Instance.new("ScrollingFrame"); tpScrollList.Size = UDim2.new(1, 0, 0, 200); tpScrollList.BackgroundColor3 = Color3.fromRGB(20, 20, 22); tpScrollList.BorderSizePixel = 0; tpScrollList.ScrollBarThickness = 3; tpScrollList.ScrollBarImageColor3 = TEXT_WHITE; tpScrollList.ZIndex = 52; tpScrollList.Parent = contentArea
+        Instance.new("UICorner", tpScrollList).CornerRadius = UDim.new(0, 10)
+        local tpListLayout = Instance.new("UIListLayout"); tpListLayout.Padding = UDim.new(0, 5); tpListLayout.Parent = tpScrollList
+        local tpListPadding = Instance.new("UIPadding"); tpListPadding.PaddingTop = UDim.new(0, 5); tpListPadding.PaddingLeft = UDim.new(0, 5); tpListPadding.PaddingRight = UDim.new(0, 5); tpListPadding.Parent = tpScrollList
+        
+        local function updateTpList()
+            for _, child in ipairs(tpScrollList:GetChildren()) do if child:IsA("TextButton") then child:Destroy() end end
+            local players = Players:GetPlayers(); table.sort(players, function(a, b) return a.Name < b.Name end)
+            for _, p in ipairs(players) do
+                local btn = Instance.new("TextButton"); btn.Size = UDim2.new(1, 0, 0, 30); btn.BackgroundColor3 = Color3.fromRGB(35, 35, 40); btn.BorderSizePixel = 0; btn.Text = " " .. p.Name; btn.TextColor3 = TEXT_WHITE; btn.TextSize = 13; btn.Font = HUB_FONT; btn.TextXAlignment = Enum.TextXAlignment.Left; btn.AutoButtonColor = false; btn.ZIndex = 53; btn.Parent = tpScrollList
+                Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
+                btn.MouseButton1Click:Connect(function() tpBox.Text = p.Name; teleportToPlayer(p.Name) end)
+            end
+        end
+        updateTpList(); Players.PlayerAdded:Connect(function() task.wait(1); updateTpList() end); Players.PlayerRemoving:Connect(function() task.wait(1); updateTpList() end)
     end)
 end)
 
