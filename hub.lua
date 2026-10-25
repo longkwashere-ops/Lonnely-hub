@@ -1,5 +1,5 @@
 -- ============================================================
--- LONELY HUB v83 - SIDEBAR FULL (FIX INF JUMP + TELEPORT)
+-- LONELY HUB v83 - SIDEBAR FULL (FIX UNLOCK FPS CHUẨN)
 -- ============================================================
 
 local Players = game:GetService("Players")
@@ -28,7 +28,7 @@ local state = {
     savedSpeed = 16, savedJump = 50, savedGravity = 196.2, savedFov = 70,
     savedMinZoom = 0.5, savedMaxZoom = 128, smoothOn = false, infJumpOn = false,
     trailOn = false, autoPressOn = false, realClockOn = false, sessionTimeOn = false,
-    espOn = false, targetName = ""
+    espOn = false, targetName = "", hideUIOn = false, hideUISaved = {}
 }
 
 local character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
@@ -41,7 +41,6 @@ local function applyGravity() if state.gravityOn then workspace.Gravity = state.
 local function applyFOV() if state.fovOn then Camera.FieldOfView = state.fov end end
 local function applyZoom() if state.zoomOn then pcall(function() LocalPlayer.CameraMinZoomDistance = state.minZoom; LocalPlayer.CameraMaxZoomDistance = state.maxZoom end) end end
 
--- UNLOCK FPS
 RunService.RenderStepped:Connect(function()
     if not state.unlockFPS then return end
     pcall(function()
@@ -50,7 +49,6 @@ RunService.RenderStepped:Connect(function()
     end)
 end)
 
--- HIDE BODY
 local function hidePart(part) if part and part:IsA("BasePart") then part.LocalTransparencyModifier = 1 end end
 local function showPart(part) if part and part:IsA("BasePart") then part.LocalTransparencyModifier = 0 end end
 local function applyHide()
@@ -66,7 +64,34 @@ end
 applyHide()
 RunService.Heartbeat:Connect(function() if character and character.Parent then applyHide() end end)
 
--- SMOOTH SPEED
+local function isKeep(g)
+    local n = g.Name:lower()
+    if g.Name == "TouchGui" then return true end
+    if n:find("joystick") or n:find("jump") or n:find("chat") then return true end
+    if g.Name == "LonelySidebar" or g.Name == "TimerDisplay" or g.Name == "SpeedDisplay" or g.Name == "StatsDisplay" then return true end
+    return false
+end
+local function applyHideUI()
+    if state.hideUIOn then state.hideUISaved = {} end
+    local function scan(parent)
+        for _, g in ipairs(parent:GetChildren()) do
+            if g:IsA("ScreenGui") and not isKeep(g) then
+                if state.hideUIOn then
+                    state.hideUISaved[g] = g.Enabled
+                    g.Enabled = false
+                else
+                    if state.hideUISaved[g] ~= nil then
+                        g.Enabled = state.hideUISaved[g]
+                        state.hideUISaved[g] = nil
+                    end
+                end
+            end
+        end
+    end
+    pcall(function() scan(LocalPlayer.PlayerGui) end)
+    pcall(function() scan(game:GetService("CoreGui")) end)
+end
+
 local bv = nil
 local function setupBV()
     if bv then bv:Destroy() end
@@ -85,7 +110,6 @@ RunService.Heartbeat:Connect(function()
     end
 end)
 
--- TRAIL
 local currentTrail = nil
 local function createTrail()
     pcall(function()
@@ -108,7 +132,6 @@ local function removeTrail()
     end)
 end
 
--- ESP
 local espObjects = {}
 local function createESP(player)
     if player == LocalPlayer then return end
@@ -142,7 +165,6 @@ for _, player in ipairs(Players:GetPlayers()) do hookPlayer(player) end
 Players.PlayerAdded:Connect(hookPlayer)
 Players.PlayerRemoving:Connect(removeESP)
 
--- TELEPORT LOGIC
 local function teleportToPlayer(targetName)
     local targetPlayer = nil
     for _, p in ipairs(Players:GetPlayers()) do
@@ -155,7 +177,10 @@ local function teleportToPlayer(targetName)
     end
 end
 
--- TIMER & OVERLAYS
+UserInput.JumpRequest:Connect(function()
+    if state.infJumpOn and humanoid and humanoid.Parent then humanoid:ChangeState(Enum.HumanoidStateType.Jumping) end
+end)
+
 local overlayGui = Instance.new("ScreenGui"); overlayGui.Name = "Overlays"; overlayGui.ResetOnSpawn = false; overlayGui.IgnoreGuiInset = true
 pcall(function() overlayGui.Parent = game:GetService("CoreGui") end); if not overlayGui.Parent then overlayGui.Parent = LocalPlayer:WaitForChild("PlayerGui") end
 local autoPressTimeLeft, autoPressAccumulated = 300, 0
@@ -193,13 +218,6 @@ RunService.Heartbeat:Connect(function(dt)
     end
 end)
 
--- INF JUMP (FIX)
-UserInput.JumpRequest:Connect(function()
-    if state.infJumpOn and humanoid and humanoid.Parent then
-        humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
-    end
-end)
-
 -- ============================================================
 -- GIAO DIỆN SIDEBAR
 -- ============================================================
@@ -219,8 +237,23 @@ local title = Instance.new("TextLabel"); title.Size = UDim2.new(1, -100, 1, 0); 
 local btnClose = Instance.new("TextButton"); btnClose.Size = UDim2.new(0, 30, 0, 30); btnClose.Position = UDim2.new(1, -45, 0, 10); btnClose.BackgroundColor3 = Color3.fromRGB(40, 40, 40); btnClose.BorderSizePixel = 0; btnClose.Text = "X"; btnClose.TextColor3 = TEXT_WHITE; btnClose.TextSize = 16; btnClose.Font = HUB_FONT; btnClose.ZIndex = 52; btnClose.Parent = header
 Instance.new("UICorner", btnClose).CornerRadius = UDim.new(0, 6)
 
-local sidebar = Instance.new("Frame"); sidebar.Size = UDim2.new(0, 180, 1, -60); sidebar.Position = UDim2.new(0, 10, 0, 50); sidebar.BackgroundTransparency = 1; sidebar.ZIndex = 51; sidebar.Parent = main
+local sidebar = Instance.new("ScrollingFrame")
+sidebar.Size = UDim2.new(0, 180, 1, -60)
+sidebar.Position = UDim2.new(0, 10, 0, 50)
+sidebar.BackgroundTransparency = 1
+sidebar.BorderSizePixel = 0
+sidebar.ScrollBarThickness = 3
+sidebar.ScrollBarImageColor3 = TEXT_WHITE
+sidebar.CanvasSize = UDim2.new(0, 0, 0, 0)
+sidebar.ScrollingDirection = Enum.ScrollingDirection.Y
+sidebar.ClipsDescendants = true
+sidebar.ZIndex = 51
+sidebar.Parent = main
+
 local sidebarLayout = Instance.new("UIListLayout"); sidebarLayout.Padding = UDim.new(0, 5); sidebarLayout.Parent = sidebar
+sidebarLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+    sidebar.CanvasSize = UDim2.new(0, 0, 0, sidebarLayout.AbsoluteContentSize.Y + 10)
+end)
 
 local contentArea = Instance.new("ScrollingFrame"); contentArea.Size = UDim2.new(1, -210, 1, -60); contentArea.Position = UDim2.new(0, 200, 0, 50); contentArea.BackgroundTransparency = 1; contentArea.BorderSizePixel = 0; contentArea.ScrollBarThickness = 3; contentArea.ScrollBarImageColor3 = TEXT_WHITE; contentArea.ZIndex = 51; contentArea.Parent = main
 local contentLayout = Instance.new("UIListLayout"); contentLayout.Padding = UDim.new(0, 5); contentLayout.Parent = contentArea
@@ -269,6 +302,9 @@ local function makeSlider(name, stateKey, min, max, step, callback)
     end
     track.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            local knobCenter = knob.AbsolutePosition + (knob.AbsoluteSize / 2)
+            local distance = (Vector2.new(input.Position.X, input.Position.Y) - knobCenter).Magnitude
+            if distance > 25 then return end
             if not activeSliderTouch then activeSliderTouch = input; localDrag = true; local relX = math.clamp((input.Position.X - track.AbsolutePosition.X) / track.AbsoluteSize.X, 0, 1); local raw = min + relX * (max - min); setValue(math.floor(raw / step + 0.5) * step, false) end
         end
     end)
@@ -311,16 +347,41 @@ tabPlayer.MouseButton1Click:Connect(function()
         makeSlider("JUMP", "jump", 0, 500, 5, function(v) if state.jumpOn then applyJump() end end)
         makeSlider("GRAVITY", "gravity", 0, 1000, 10, function(v) if state.gravityOn then applyGravity() end end)
         makeSlider("FOV", "fov", 70, 160, 5, function(v) if state.fovOn then applyFOV() end end)
-        makeSlider("MIN ZOOM", "minZoom", 0.5, 20, 0.5, function(v) if state.zoomOn then applyZoom() end end)
-        makeSlider("MAX ZOOM", "maxZoom", 0.5, 1000, 5, function(v) if state.zoomOn then applyZoom() end end)
-        
+    end)
+end)
+
+local tabLocks = makeTab("Locks", "🔒")
+tabLocks.MouseButton1Click:Connect(function()
+    selectTab(tabLocks, function()
         makeToggle("SPEED LOCK", "speedOn", function(v) if v then state.savedSpeed = humanoid.WalkSpeed; applySpeed() else humanoid.WalkSpeed = state.savedSpeed end end)
         makeToggle("JUMP LOCK", "jumpOn", function(v) if v then state.savedJump = humanoid.JumpPower; applyJump() else humanoid.JumpPower = state.savedJump end end)
         makeToggle("GRAVITY LOCK", "gravityOn", function(v) if v then state.savedGravity = workspace.Gravity; applyGravity() else workspace.Gravity = state.savedGravity end end)
         makeToggle("FOV LOCK", "fovOn", function(v) if v then state.savedFov = Camera.FieldOfView; applyFOV() else Camera.FieldOfView = state.savedFov end end)
+    end)
+end)
+
+local tabOptimize = makeTab("Optimize", "⚙️")
+tabOptimize.MouseButton1Click:Connect(function()
+    selectTab(tabOptimize, function()
+        makeSlider("MIN ZOOM", "minZoom", 0.5, 20, 0.5, function(v) if state.zoomOn then applyZoom() end end)
+        makeSlider("MAX ZOOM", "maxZoom", 0.5, 1000, 5, function(v) if state.zoomOn then applyZoom() end end)
+        
         makeToggle("ZOOM LOCK", "zoomOn", function(v) 
             if v then state.savedMinZoom = LocalPlayer.CameraMinZoomDistance; state.savedMaxZoom = LocalPlayer.CameraMaxZoomDistance; applyZoom() 
             else pcall(function() LocalPlayer.CameraMinZoomDistance = state.savedMinZoom; LocalPlayer.CameraMaxZoomDistance = state.savedMaxZoom end) end
+        end)
+        
+        makeToggle("UNLOCK FPS", "unlockFPS", function(v) 
+            state.unlockFPS = v 
+            if not v then
+                pcall(function()
+                    LocalPlayer.CameraMinZoomDistance = 0.5
+                    LocalPlayer.CameraMaxZoomDistance = 128
+                    LocalPlayer.CameraMode = Enum.CameraMode.Classic
+                end)
+            else
+                pcall(function() LocalPlayer.CameraMode = Enum.CameraMode.Classic end)
+            end
         end)
     end)
 end)
@@ -347,7 +408,6 @@ tabVisuals.MouseButton1Click:Connect(function()
     end)
 end)
 
--- TAB ESP
 local tabESP = makeTab("ESP", "👁️")
 tabESP.MouseButton1Click:Connect(function()
     selectTab(tabESP, function()
@@ -375,7 +435,6 @@ tabESP.MouseButton1Click:Connect(function()
     end)
 end)
 
--- TAB TELEPORT
 local tabTeleport = makeTab("Teleport", "📍")
 tabTeleport.MouseButton1Click:Connect(function()
     selectTab(tabTeleport, function()
@@ -413,8 +472,7 @@ tabUtils.MouseButton1Click:Connect(function()
         makeToggle("REAL CLOCK", "realClockOn", function(v) clockLabel.Visible = v end)
         makeToggle("SESSION TIME", "sessionTimeOn", function(v) sessionLabel.Visible = v end)
         makeToggle("STATS DISPLAY", "statsDisplayOn", function(v) statsFrame.Visible = v end)
-        makeToggle("HIDE GAME UI", "hideUIOn", function(v) hideUIOn = v; applyHideUI() end)
-        makeToggle("UNLOCK FPS", "unlockFPS", function(v) state.unlockFPS = v end)
+        makeToggle("HIDE GAME UI", "hideUIOn", function(v) applyHideUI() end)
     end)
 end)
 
